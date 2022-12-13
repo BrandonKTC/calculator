@@ -1,1 +1,3 @@
 # calculator
+
+## calculatrice fonctionality
