@@ -1,30 +1,33 @@
 const letters = document.querySelectorAll(".scoreboard-letter");
 const loadingDiv = document.querySelector(".info-bar");
 const ANSWER_LENGTH = 5;
+const ROUNDS = 6;
 
 async function init() {
 	let currentGuess = "";
 	let currentRow = 0;
-	const ROUNDS = 6;
+	let isLoading = true;
 
-	const res = await fetch("https://words.dev-apis.com/word-of-the-day");
-	const resObjt = await res.json();
-	const word = resObjt.word.toUpperCase();
-	console.log(word);
+	const res = await fetch(
+		"https://words.dev-apis.com/word-of-the-day?random=1"
+	);
+	const resObj = await res.json();
+	const word = resObj.word.toUpperCase();
 	const wordParts = word.split("");
 	let done = false;
-	console.log(wordParts);
 	setLoading(false);
+	isLoading = false;
 
 	function addLetter(letter) {
 		if (currentGuess.length < ANSWER_LENGTH) {
-			// Add letter to the end
+			// add letter to the end
 			currentGuess += letter;
-			// replace the last letter
 		} else {
+			// replace the last letter
 			currentGuess =
 				currentGuess.substring(0, currentGuess.length - 1) + letter;
 		}
+
 		letters[ANSWER_LENGTH * currentRow + currentGuess.length - 1].innerText =
 			letter;
 	}
@@ -35,48 +38,59 @@ async function init() {
 			return;
 		}
 
-		if (currentGuess === word) {
-			// win
-			alert("you win!");
-			done = true;
+		isLoading = true;
+		setLoading(true);
+		const res = await fetch("https://words.dev-apis.com/validate-word", {
+			method: "POST",
+			body: JSON.stringify({ word: currentGuess }),
+		});
+
+		const resObj = await res.json();
+		const validWord = resObj.validWord;
+		// const { validWord } = resObj;
+
+		isLoading = false;
+		setLoading(false);
+
+		if (!validWord) {
+			markInvalidWord();
 			return;
 		}
-		// TODO: validate the word
 
-		// TODO: do all the marking as "correct" "close" or "wrong"
-		currentRow++;
-		currentGuess = "";
-		if (currentRow === ROUNDS) {
-			alert(`you lose, the word was ${word}`);
-			done = true;
-		}
-
-		const guestParts = currentGuess.split("");
+		const guessParts = currentGuess.split("");
 		const map = makeMap(wordParts);
 
 		for (let i = 0; i < ANSWER_LENGTH; i++) {
-			if (guestParts[i] === wordParts[i]) {
+			// mark as correct
+			if (guessParts[i] === wordParts[i]) {
 				letters[currentRow * ANSWER_LENGTH + i].classList.add("correct");
-				map[guestParts[i]]--;
+				map[guessParts[i]]--;
 			}
 		}
 
 		for (let i = 0; i < ANSWER_LENGTH; i++) {
-			if (guestParts[i] === wordParts[i]) {
-				// do nothing, already didn it
-			} else if (
-				wordParts.includes(guestParts[i]) &&
-				map[guestParts[i] > 0] /* TODO make this more accurate */
-			) {
+			if (guessParts[i] === wordParts[i]) {
+				// do nothing, we already did it
+			} else if (wordParts.includes(guessParts[i]) && map[guessParts[i]] > 0) {
+				// mark as close
 				letters[currentRow * ANSWER_LENGTH + i].classList.add("close");
-				map[guestParts[i]]--;
+				map[guessParts[i]]--;
 			} else {
 				letters[currentRow * ANSWER_LENGTH + i].classList.add("wrong");
 			}
 		}
 
-		// TODO: did they win or lose ?
 		currentRow++;
+		if (currentGuess === word) {
+			// win
+			alert("you win!");
+			document.querySelector(".brand").classList.add("winner");
+			done = true;
+			return;
+		} else if (currentRow === ROUNDS) {
+			alert(`you lose, the word was ${word}`);
+			done = true;
+		}
 		currentGuess = "";
 	}
 
@@ -85,9 +99,23 @@ async function init() {
 		letters[ANSWER_LENGTH * currentRow + currentGuess.length].innerText = "";
 	}
 
+	function markInvalidWord() {
+		for (let i = 0; i < ANSWER_LENGTH; i++) {
+			letters[currentRow * ANSWER_LENGTH + i].classList.remove("invalid");
+
+			setTimeout(function () {
+				letters[currentRow * ANSWER_LENGTH + i].classList.add("invalid");
+			}, 10);
+		}
+	}
+
 	document.addEventListener("keydown", function handleKeyPress(event) {
+		if (done || isLoading) {
+			// do nothing
+			return;
+		}
+
 		const action = event.key;
-		console.log(action);
 
 		if (action === "Enter") {
 			commit();
@@ -106,7 +134,7 @@ function isLetter(letter) {
 }
 
 function setLoading(isLoading) {
-	loadingDiv.classList.toggle("hidden", !isLoading);
+	loadingDiv.classList.toggle("show", isLoading);
 }
 
 function makeMap(array) {
@@ -119,6 +147,7 @@ function makeMap(array) {
 			obj[letter] = 1;
 		}
 	}
+
 	return obj;
 }
 
