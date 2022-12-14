@@ -1,3 +1,3 @@
-# calculator
+# Wordmaster Frontend Master course
 
-## calculatrice fonctionality
+## Game fonctionality
